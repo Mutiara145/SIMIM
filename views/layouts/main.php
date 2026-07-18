@@ -4,78 +4,120 @@
 /** @var string $content */
 
 use app\assets\AppAsset;
-use app\widgets\Alert;
-use yii\bootstrap5\Breadcrumbs;
-use yii\bootstrap5\Html;
-use yii\bootstrap5\Nav;
-use yii\bootstrap5\NavBar;
+use yii\helpers\Html;
+use yii\helpers\Url;
 
 AppAsset::register($this);
-
 $this->registerCsrfMetaTags();
 $this->registerMetaTag(['charset' => Yii::$app->charset], 'charset');
-$this->registerMetaTag(['name' => 'viewport', 'content' => 'width=device-width, initial-scale=1, shrink-to-fit=no']);
-$this->registerMetaTag(['name' => 'description', 'content' => $this->params['meta_description'] ?? '']);
-$this->registerMetaTag(['name' => 'keywords', 'content' => $this->params['meta_keywords'] ?? '']);
-$this->registerLinkTag(['rel' => 'icon', 'type' => 'image/x-icon', 'href' => Yii::getAlias('@web/favicon.ico')]);
+$this->registerMetaTag(['name' => 'viewport', 'content' => 'width=device-width, initial-scale=1']);
+
+$identity = Yii::$app->user->identity;
+$controllerId = Yii::$app->controller->id;
+
+// Menu sidebar: [controller, ikon, label, role yang boleh]
+$menu = [
+    ['dashboard', '◈', 'Dashboard', ['super_admin', 'admin', 'kepala_unit']],
+    ['logbook', '⊞', 'Logbook', ['super_admin', 'admin', 'kepala_unit']],
+    ['indikator', '◫', 'Kelola Profil Indikator', ['super_admin', 'admin']],
+    ['pengguna', '◎', 'Kelola Pengguna', ['super_admin', 'admin']],
+];
+
+$inisial = '?';
+if ($identity) {
+    $kata = preg_split('/\s+/', trim($identity->nama_lengkap));
+    $inisial = strtoupper(substr($kata[0], 0, 1) . substr($kata[1] ?? '', 0, 1));
+}
 ?>
 <?php $this->beginPage() ?>
 <!DOCTYPE html>
-<html lang="<?= Yii::$app->language ?>" class="h-100">
+<html lang="<?= Yii::$app->language ?>">
 <head>
-    <title><?= Html::encode($this->title) ?></title>
+    <title><?= Html::encode($this->title) ?> — SIMIM</title>
     <?php $this->head() ?>
 </head>
-<body class="d-flex flex-column h-100">
+<body>
 <?php $this->beginBody() ?>
 
-<header id="header">
-    <?php
-    NavBar::begin([
-        'brandLabel' => Yii::$app->name,
-        'brandUrl' => Yii::$app->homeUrl,
-        'options' => ['class' => 'navbar-expand-md navbar-dark bg-dark fixed-top']
-    ]);
-    echo Nav::widget([
-        'options' => ['class' => 'navbar-nav'],
-        'items' => [
-            ['label' => 'Home', 'url' => ['/site/index']],
-            ['label' => 'About', 'url' => ['/site/about']],
-            ['label' => 'Contact', 'url' => ['/site/contact']],
-            Yii::$app->user->isGuest
-                ? ['label' => 'Login', 'url' => ['/site/login']]
-                : '<li class="nav-item">'
-                    . Html::beginForm(['/site/logout'])
-                    . Html::submitButton(
-                        'Logout (' . Yii::$app->user->identity->username . ')',
-                        ['class' => 'nav-link btn btn-link logout']
-                    )
-                    . Html::endForm()
-                    . '</li>'
-        ]
-    ]);
-    NavBar::end();
-    ?>
-</header>
-
-<main id="main" class="flex-shrink-0" role="main">
-    <div class="container">
-        <?php if (!empty($this->params['breadcrumbs'])): ?>
-            <?= Breadcrumbs::widget(['links' => $this->params['breadcrumbs']]) ?>
-        <?php endif ?>
-        <?= Alert::widget() ?>
-        <?= $content ?>
-    </div>
-</main>
-
-<footer id="footer" class="mt-auto py-3 bg-light">
-    <div class="container">
-        <div class="row text-muted">
-            <div class="col-md-6 text-center text-md-start">&copy; My Company <?= date('Y') ?></div>
-            <div class="col-md-6 text-center text-md-end"><?= Yii::powered() ?></div>
+<?php if ($identity === null): ?>
+    <div class="halaman-polos"><div class="kartu" style="max-width:520px"><?= $content ?></div></div>
+<?php else: ?>
+<div class="app">
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="logo">✦</div>
+            <div>
+                <div class="nama">SIMIM</div>
+                <div class="sub">Sistem Indikator Mutu RS</div>
+            </div>
         </div>
+        <nav>
+            <div class="kepala-menu">Menu Utama</div>
+            <?php foreach ($menu as [$ctrl, $ikon, $label, $roles]): ?>
+                <?php if (in_array($identity->role, $roles, true)): ?>
+                    <a href="<?= Url::to(["/$ctrl/index"]) ?>" class="<?= $controllerId === $ctrl ? 'aktif' : '' ?>">
+                        <span class="ikon"><?= $ikon ?></span> <?= $label ?>
+                    </a>
+                <?php endif ?>
+            <?php endforeach ?>
+        </nav>
+        <div class="profil">
+            <div class="avatar"><?= Html::encode($inisial) ?></div>
+            <div>
+                <div class="nama"><?= Html::encode($identity->nama_lengkap) ?></div>
+                <div class="jabatan">
+                    <?= Html::encode($identity->isKepalaUnit() && $identity->unit
+                        ? 'Kepala Unit ' . $identity->unit->nama
+                        : $identity->roleLabel) ?>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="utama">
+        <header class="navbar">
+            <div class="judul">
+                <?= Html::encode($this->title) ?>
+                <span style="color:#cbd5e1">|</span>
+                <span class="jam" id="jam-navbar"></span>
+            </div>
+            <div class="kanan">
+                <span class="badge-role <?= $identity->role ?>"><?= Html::encode($identity->roleLabel) ?></span>
+                <?= Html::beginForm(['/site/logout']) ?>
+                <?= Html::submitButton('Keluar', ['class' => 'tombol-keluar']) ?>
+                <?= Html::endForm() ?>
+            </div>
+        </header>
+
+        <main class="konten">
+            <?php foreach (['sukses' => 'flash-sukses', 'gagal' => 'flash-gagal'] as $kunci => $kelas): ?>
+                <?php if (Yii::$app->session->hasFlash($kunci)): ?>
+                    <div class="flash <?= $kelas ?>"><?= Yii::$app->session->getFlash($kunci) ?></div>
+                <?php endif ?>
+            <?php endforeach ?>
+            <?= $content ?>
+        </main>
+
+        <footer class="footer">
+            <span><b>SIMIM</b> — Sistem Informasi Profil Indikator Mutu · RS Jiwa Tampan</span>
+            <span>&copy; <?= date('Y') ?></span>
+        </footer>
     </div>
-</footer>
+</div>
+
+<script>
+(function () {
+    var el = document.getElementById('jam-navbar');
+    function tik() {
+        var kini = new Date();
+        el.innerHTML = kini.toLocaleDateString('id-ID', {weekday:'short', day:'2-digit', month:'short', year:'numeric'})
+            + ' <b>' + kini.toLocaleTimeString('id-ID') + '</b>';
+    }
+    tik();
+    setInterval(tik, 1000);
+})();
+</script>
+<?php endif ?>
 
 <?php $this->endBody() ?>
 </body>
